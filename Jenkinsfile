@@ -55,28 +55,35 @@ pipeline {
             steps {
                 script{
                     withDockerRegistry(credentialsId: 'docker-cred') {
-                    sh "docker build -t aakashhandibar/zomato:v2 ."
+                    sh "docker build -t aakashhandibar/zomato:v1 ."
                     }
                 }
             }
         }
         stage('Trivy image Scan') {
             steps {
-                sh "trivy image --format table -o trivy-image-report.html aakashhandibar/zomato:v2"
+                sh "trivy image --format table -o trivy-image-report.html aakashhandibar/zomato:v1"
             }
         }
         stage('Docker Push') {
             steps {
                 script{
                     withDockerRegistry(credentialsId: 'docker-cred'){
-                    sh "docker push aakashhandibar/zomato:v2"
+                    sh "docker push aakashhandibar/zomato:v1"
                     }
                 }
             }
         }
-        stage('Deploy to container') {
+        stage('Deploy to kubernetes') {
             steps {
-                sh "docker run -d --name zomato -p 3000:3000 aakashhandibar/zomato:v2"
+                withKubeConfig(caCertificate: '', clusterName: 'zomato-sfm', contextName: '', credentialsId: 'kube-secret', namespace: 'zomato', restrictKubeConfigAccess: false, serverUrl: 'https://9D6B2BA7A8966ACFE312ECE75277B58B.gr7.ap-south-1.eks.amazonaws.com') {
+                    dir('/var/lib/jenkins/workspace/k8s-manifest/k8smanifests') {
+                        sh "kubectl apply -f deployment.yaml"
+                        sh "kubectl apply -f service.yaml"
+                        sh "kubectl get pods"
+                        sh "kubectl get svc"
+                    }
+                }
             }
         }
     }
